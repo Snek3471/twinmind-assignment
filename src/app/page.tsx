@@ -125,8 +125,8 @@ export default function Home() {
         </div>
       )}
 
-      {/* 3-panel layout */}
-      <div className="flex-1 min-h-0 grid grid-cols-3 divide-x divide-[#2a2d3a]">
+      {/* 3-panel layout — flex-1 min-h-0 overflow-hidden locks columns to remaining viewport height */}
+      <div className="flex-1 min-h-0 overflow-hidden grid grid-cols-3 divide-x divide-[#2a2d3a]">
         <TranscriptPanel
           status={status}
           chunks={chunks}

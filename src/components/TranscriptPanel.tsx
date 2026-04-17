@@ -43,7 +43,7 @@ export function TranscriptPanel({ status, chunks, error, onStart, onStop, onExpo
   }, [chunks]);
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full overflow-hidden">
       {/* Header — contains title, mic button, status badge, and export. No floating elements. */}
       <div className="flex items-center gap-2 px-3 py-2.5 border-b border-[#2a2d3a] flex-shrink-0">
         <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-widest flex-shrink-0">

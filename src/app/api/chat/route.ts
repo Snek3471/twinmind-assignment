@@ -10,7 +10,7 @@ export async function POST(req: Request) {
       return Response.json({ error: parsed.error.message }, { status: 400 });
     }
 
-    const { messages, systemPrompt, transcriptContext, apiKey } = parsed.data;
+    const { messages, systemPrompt, transcriptContext, apiKey, isSuggestion } = parsed.data;
 
     const fullSystem = transcriptContext
       ? `${systemPrompt}\n\n---\nFull meeting transcript so far:\n${transcriptContext}`
@@ -26,7 +26,7 @@ export async function POST(req: Request) {
       ],
       stream: true,
       temperature: 0.5,
-      max_tokens: 2048,
+      max_tokens: isSuggestion ? 300 : 2048,
     });
 
     const encoder = new TextEncoder();

@@ -85,7 +85,7 @@ export function ChatPanel({
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-[#2a2d3a]">
         <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-widest">
