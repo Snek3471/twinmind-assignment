@@ -22,8 +22,23 @@ export function useTranscript(settings: Settings) {
   const settingsRef = useRef(settings);
   settingsRef.current = settings;
 
+  // Holds the resolve fn for a pending flushCurrent() Promise.
+  // Resolved in transcribeBlob's finally block so the caller knows transcription is done.
+  const flushResolveRef = useRef<(() => void) | null>(null);
+
   const transcribeBlob = useCallback(async (blob: Blob) => {
-    if (blob.size < 1000) return; // skip near-empty chunks
+    // Capture any pending flush resolve at call time — the ref may change during the async call
+    const pendingResolve = flushResolveRef.current;
+
+    if (blob.size < 1000) {
+      // Near-empty chunk (silence) — resolve flush immediately so the caller isn't stuck
+      if (pendingResolve) {
+        flushResolveRef.current = null;
+        pendingResolve();
+      }
+      return;
+    }
+
     const start = Date.now();
     try {
       const formData = new FormData();
@@ -38,8 +53,7 @@ export function useTranscript(settings: Settings) {
       }
 
       const { text } = await res.json();
-      const latency = Date.now() - start;
-      console.log(`[transcribe] ${latency}ms — "${text?.slice(0, 60)}"`);
+      console.log(`[transcribe] ${Date.now() - start}ms — "${text?.slice(0, 60)}"`);
 
       if (text?.trim()) {
         const chunk: TranscriptChunk = { id: nextId(), text: text.trim(), timestamp: Date.now() };
@@ -47,6 +61,12 @@ export function useTranscript(settings: Settings) {
       }
     } catch (e) {
       console.error("[transcribe] fetch error", e);
+    } finally {
+      // Always resolve after transcription completes (success, empty result, or error)
+      if (pendingResolve) {
+        flushResolveRef.current = null;
+        pendingResolve();
+      }
     }
   }, []);
 
@@ -88,9 +108,10 @@ export function useTranscript(settings: Settings) {
       setStatus("recording");
       startChunk(stream);
     } catch (e) {
-      const msg = e instanceof DOMException && e.name === "NotAllowedError"
-        ? "Microphone permission denied."
-        : "Could not access microphone.";
+      const msg =
+        e instanceof DOMException && e.name === "NotAllowedError"
+          ? "Microphone permission denied."
+          : "Could not access microphone.";
       setError(msg);
       setStatus("error");
     }
@@ -112,6 +133,45 @@ export function useTranscript(settings: Settings) {
     setStatus("idle");
   }, []);
 
+  /**
+   * Flush the current audio buffer:
+   * 1. Cancels the pending auto-restart timer
+   * 2. Stops the current recorder (fires ondataavailable with buffered audio)
+   * 3. Sends the audio to Whisper and awaits the result
+   * 4. Restarts the recorder for the next chunk
+   * 5. Resolves when transcription is complete (state updated if text was found)
+   *
+   * Safe to call when not recording — resolves immediately with no side effects.
+   */
+  const flushCurrent = useCallback((): Promise<void> => {
+    return new Promise((resolve) => {
+      const recorder = recorderRef.current;
+      if (!recorder || recorder.state === "inactive" || !isRecordingRef.current) {
+        resolve();
+        return;
+      }
+
+      // Store resolve — transcribeBlob will call it in finally
+      flushResolveRef.current = resolve;
+
+      // Cancel the auto-restart so we control when the next chunk starts
+      if (chunkTimerRef.current) {
+        clearTimeout(chunkTimerRef.current);
+        chunkTimerRef.current = null;
+      }
+
+      // onstop fires after ondataavailable — restart recording here
+      // (transcribeBlob is already running async; recording restarts while API call is in flight)
+      recorder.onstop = () => {
+        if (isRecordingRef.current && streamRef.current) {
+          startChunk(streamRef.current);
+        }
+      };
+
+      recorder.stop();
+    });
+  }, [startChunk]);
+
   const clearTranscript = useCallback(() => setChunks([]), []);
 
   const fullTranscript = chunks.map((c) => c.text).join(" ");
@@ -123,6 +183,7 @@ export function useTranscript(settings: Settings) {
     error,
     startRecording,
     stopRecording,
+    flushCurrent,
     clearTranscript,
     isRecording: status === "recording",
   };

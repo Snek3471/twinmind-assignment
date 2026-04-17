@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useSettings } from "@/hooks/useSettings";
 import { useTranscript } from "@/hooks/useTranscript";
 import { useSuggestions } from "@/hooks/useSuggestions";
@@ -24,6 +24,7 @@ export default function Home() {
     error: transcriptError,
     startRecording,
     stopRecording,
+    flushCurrent,
     isRecording,
   } = useTranscript(settings);
 
@@ -32,9 +33,8 @@ export default function Home() {
     batchCount,
     isLoading: suggestionsLoading,
     error: suggestionsError,
-    countdown,
-    reload: reloadSuggestions,
-  } = useSuggestions(isRecording, fullTranscript, settings);
+    fetchSuggestions,
+  } = useSuggestions(settings);
 
   const {
     messages,
@@ -43,6 +43,30 @@ export default function Home() {
     sendMessage,
     sendSuggestion,
   } = useChat(fullTranscript, settings);
+
+  // Track previous chunk count so the effect fires only on NEW chunks, not on mount.
+  const prevChunkCountRef = useRef(0);
+
+  // The primary trigger: suggestions run only AFTER transcript state is committed.
+  // This guarantees fetchSuggestions always reads the latest transcript text.
+  // suppressNextAutoFetchRef lets the manual reload handler skip one auto-trigger
+  // to prevent double-fetching when a flush and the effect fire for the same chunk.
+  useEffect(() => {
+    if (chunks.length > prevChunkCountRef.current) {
+      prevChunkCountRef.current = chunks.length;
+      if (!suppressNextAutoFetchRef.current) {
+        fetchSuggestions(fullTranscript);
+      }
+    }
+  }, [chunks.length, fullTranscript, fetchSuggestions]);
+
+  // Keep a ref so handleReload can read the latest transcript inside an async callback
+  const fullTranscriptRef = useRef(fullTranscript);
+  fullTranscriptRef.current = fullTranscript;
+
+  // suppressNextAutoFetch: when manual reload triggers a flush that adds a chunk,
+  // the useEffect above would fire and double-fetch. This ref prevents that.
+  const suppressNextAutoFetchRef = useRef(false);
 
   const handleSelectSuggestion = useCallback((suggestion: Suggestion) => {
     setActiveSuggestionId(suggestion.id);
@@ -64,6 +88,19 @@ export default function Home() {
     a.click();
     URL.revokeObjectURL(url);
   }, [chunks, batches, messages]);
+
+  // Manual reload: flush current audio → await transcription → fetch suggestions.
+  // suppressNextAutoFetchRef prevents the useEffect from double-fetching when the flush
+  // adds a new chunk and the effect fires at the same time.
+  const handleReload = useCallback(async () => {
+    if (isRecording) {
+      suppressNextAutoFetchRef.current = true;
+      await flushCurrent();
+      suppressNextAutoFetchRef.current = false;
+    }
+    // Always fetch after manual reload using the latest transcript
+    fetchSuggestions(fullTranscriptRef.current);
+  }, [isRecording, flushCurrent, fetchSuggestions]);
 
   if (!loaded) {
     return (
@@ -141,10 +178,9 @@ export default function Home() {
           batchCount={batchCount}
           isLoading={suggestionsLoading}
           error={suggestionsError}
-          countdown={countdown}
-          isRecording={isRecording}
+          lastTranscriptAt={chunks[chunks.length - 1]?.timestamp ?? null}
           activeSuggestionId={activeSuggestionId}
-          onReload={reloadSuggestions}
+          onReload={handleReload}
           onSelectSuggestion={handleSelectSuggestion}
         />
 

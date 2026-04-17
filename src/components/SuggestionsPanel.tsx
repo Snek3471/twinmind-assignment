@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { Suggestion, SuggestionBatch, SuggestionType } from "@/lib/types";
 
 interface SuggestionsPanelProps {
@@ -7,8 +8,7 @@ interface SuggestionsPanelProps {
   batchCount: number;
   isLoading: boolean;
   error: string | null;
-  countdown: number;
-  isRecording: boolean;
+  lastTranscriptAt: number | null; // timestamp of last transcript chunk — drives the "Xs since last update" counter
   activeSuggestionId: string | null;
   onReload: () => void;
   onSelectSuggestion: (suggestion: Suggestion) => void;
@@ -85,12 +85,25 @@ export function SuggestionsPanel({
   batchCount,
   isLoading,
   error,
-  countdown,
-  isRecording,
+  lastTranscriptAt,
   activeSuggestionId,
   onReload,
   onSelectSuggestion,
 }: SuggestionsPanelProps) {
+  // Count seconds since the last transcript update — resets whenever a new chunk arrives
+  const [secondsSince, setSecondsSince] = useState(0);
+  useEffect(() => {
+    if (!lastTranscriptAt) {
+      setSecondsSince(0);
+      return;
+    }
+    setSecondsSince(Math.floor((Date.now() - lastTranscriptAt) / 1000));
+    const interval = setInterval(() => {
+      setSecondsSince(Math.floor((Date.now() - lastTranscriptAt) / 1000));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [lastTranscriptAt]);
+
   return (
     <div className="flex flex-col h-full overflow-hidden">
       {/* Header */}
@@ -126,7 +139,9 @@ export function SuggestionsPanel({
           {isLoading ? "Loading..." : "Reload suggestions"}
         </button>
         <span className="text-[10px] text-gray-600">
-          {isRecording ? `auto-refresh in ${countdown}s` : "start recording to auto-refresh"}
+          {lastTranscriptAt
+            ? `updated ${secondsSince}s ago`
+            : "auto-refreshes after each transcript"}
         </span>
       </div>
 
@@ -134,10 +149,9 @@ export function SuggestionsPanel({
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-6 min-h-0">
         {/* Info callout */}
         <div className="rounded-md bg-[#1e2130] border border-[#2a2d3a] px-3 py-2.5 text-xs text-gray-400 leading-relaxed">
-          On reload (or auto every ~30s), generates{" "}
-          <strong className="text-gray-300">3 fresh suggestions</strong> from recent
-          transcript context. New batch appears at the top; older batches push down
-          (faded). Each is a tappable card: a{" "}
+          Auto-generates{" "}
+          <strong className="text-gray-300">3 fresh suggestions</strong> after each new
+          transcript chunk (~30s). New batch at top; older batches push down (faded). Each is a tappable card: a{" "}
           <span className="text-blue-400">question</span>,{" "}
           <span className="text-emerald-400">talking-point</span>,{" "}
           <span className="text-purple-400">answer</span>,{" "}
