@@ -9,11 +9,14 @@ interface ChatPanelProps {
   error: string | null;
   pendingSuggestion: Suggestion | null;
   onSendMessage: (text: string) => void;
+  onSendSuggestion: (suggestion: Suggestion) => void;
   onClearPendingSuggestion: () => void;
 }
 
 function MessageBubble({ message }: { message: ChatMessage }) {
   const isUser = message.role === "user";
+  // displayContent overrides what is shown in the UI (suggestion cards show a clean label)
+  const visibleText = message.displayContent ?? message.content;
   return (
     <div className={`flex gap-3 ${isUser ? "flex-row-reverse" : "flex-row"}`}>
       <div
@@ -30,7 +33,7 @@ function MessageBubble({ message }: { message: ChatMessage }) {
             : "bg-[#1e2130] border border-[#2a2d3a] text-gray-200"
         }`}
       >
-        <span className="whitespace-pre-wrap">{message.content}</span>
+        <span className="whitespace-pre-wrap">{visibleText}</span>
         {message.streaming && (
           <span className="inline-block w-1.5 h-4 bg-indigo-400 animate-pulse ml-0.5 align-middle rounded-sm" />
         )}
@@ -45,6 +48,7 @@ export function ChatPanel({
   error,
   pendingSuggestion,
   onSendMessage,
+  onSendSuggestion,
   onClearPendingSuggestion,
 }: ChatPanelProps) {
   const [input, setInput] = useState("");
@@ -56,14 +60,14 @@ export function ChatPanel({
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // Auto-send when a suggestion is selected
+  // Auto-send via dedicated suggestion path when a card is clicked
   useEffect(() => {
     if (pendingSuggestion && hasSentSuggestionRef.current !== pendingSuggestion.id) {
       hasSentSuggestionRef.current = pendingSuggestion.id;
-      onSendMessage(pendingSuggestion.detailPrompt);
+      onSendSuggestion(pendingSuggestion);
       onClearPendingSuggestion();
     }
-  }, [pendingSuggestion, onSendMessage, onClearPendingSuggestion]);
+  }, [pendingSuggestion, onSendSuggestion, onClearPendingSuggestion]);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();

@@ -23,7 +23,7 @@ const TYPE_CONFIG: Record<
     dot: "bg-blue-400",
     badge: "text-blue-400 bg-blue-400/10 border-blue-400/25",
   },
-  talking_point: {
+  "talking-point": {
     label: "talking point",
     dot: "bg-emerald-400",
     badge: "text-emerald-400 bg-emerald-400/10 border-emerald-400/25",
@@ -33,7 +33,7 @@ const TYPE_CONFIG: Record<
     dot: "bg-purple-400",
     badge: "text-purple-400 bg-purple-400/10 border-purple-400/25",
   },
-  fact_check: {
+  "fact-check": {
     label: "fact-check",
     dot: "bg-amber-400",
     badge: "text-amber-400 bg-amber-400/10 border-amber-400/25",
@@ -138,10 +138,11 @@ export function SuggestionsPanel({
           <strong className="text-gray-300">3 fresh suggestions</strong> from recent
           transcript context. New batch appears at the top; older batches push down
           (faded). Each is a tappable card: a{" "}
-          <span className="text-blue-400">question to ask</span>, a{" "}
-          <span className="text-emerald-400">talking point</span>, an{" "}
-          <span className="text-purple-400">answer</span>, or a{" "}
-          <span className="text-amber-400">fact-check</span>.
+          <span className="text-blue-400">question</span>,{" "}
+          <span className="text-emerald-400">talking-point</span>,{" "}
+          <span className="text-purple-400">answer</span>,{" "}
+          <span className="text-amber-400">fact-check</span>, or{" "}
+          <span className="text-cyan-400">clarification</span>.
         </div>
 
         {/* Error */}

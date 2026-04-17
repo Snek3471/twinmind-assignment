@@ -1,4 +1,4 @@
-export type SuggestionType = "question" | "talking_point" | "answer" | "fact_check" | "clarification";
+export type SuggestionType = "question" | "talking-point" | "answer" | "fact-check" | "clarification";
 
 export interface TranscriptChunk {
   id: string;
@@ -24,6 +24,7 @@ export interface ChatMessage {
   id: string;
   role: "user" | "assistant";
   content: string;
+  displayContent?: string; // UI display override — used when API message differs from what to show
   createdAt: number;
   streaming?: boolean;
 }

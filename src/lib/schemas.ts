@@ -1,12 +1,15 @@
 import { z } from "zod";
 
-export const SuggestionTypeSchema = z.enum([
-  "question",
-  "talking_point",
-  "answer",
-  "fact_check",
-  "clarification",
-]);
+// Normalize whatever the model returns ("talking point", "talking_point", "FACT CHECK") to canonical hyphenated form
+const normalizeType = (val: unknown): string => {
+  if (typeof val !== "string") return String(val);
+  return val.toLowerCase().trim().replace(/[\s_]+/g, "-");
+};
+
+export const SuggestionTypeSchema = z
+  .unknown()
+  .transform(normalizeType)
+  .pipe(z.enum(["question", "talking-point", "answer", "fact-check", "clarification"]));
 
 export const SuggestionItemSchema = z.object({
   type: SuggestionTypeSchema,
@@ -39,6 +42,9 @@ export const ChatRequestSchema = z.object({
   systemPrompt: z.string(),
   transcriptContext: z.string(),
   apiKey: z.string().min(1),
+  isSuggestion: z.boolean().optional(),
+  suggestionType: z.string().optional(),
+  suggestionPreview: z.string().optional(),
 });
 
 export type SuggestionsResponse = z.infer<typeof SuggestionsResponseSchema>;

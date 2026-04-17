@@ -41,6 +41,7 @@ export default function Home() {
     isStreaming,
     error: chatError,
     sendMessage,
+    sendSuggestion,
   } = useChat(fullTranscript, settings);
 
   const handleSelectSuggestion = useCallback((suggestion: Suggestion) => {
@@ -153,6 +154,7 @@ export default function Home() {
           error={chatError}
           pendingSuggestion={pendingSuggestion}
           onSendMessage={sendMessage}
+          onSendSuggestion={sendSuggestion}
           onClearPendingSuggestion={() => setPendingSuggestion(null)}
         />
       </div>
