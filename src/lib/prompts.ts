@@ -11,8 +11,12 @@ Identify the right mix of help types based on what is happening right now:
 - "fact-check": a factual claim in the conversation worth verifying or clarifying
 - "clarification": something ambiguous or unclear that should be unpacked
 
+Previous suggestions already shown to the user (do not repeat these):
+{PREVIOUS_SUGGESTIONS}
+
 Rules:
 - The 3 cards can be any mix of the above types — choose what would actually be most useful given the conversation
+- Do NOT repeat or rephrase any suggestion listed above
 - Each "preview" must be 1-2 sentences and self-contained — useful to read without clicking
 - Each "detail_prompt" should be an expanded, context-rich prompt that will produce a thorough answer when sent to a language model
 

@@ -13,6 +13,8 @@ export function useSuggestions(settings: Settings) {
 
   const settingsRef = useRef(settings);
   settingsRef.current = settings;
+  const batchesRef = useRef(batches);
+  batchesRef.current = batches;
 
   const MAX_ATTEMPTS = 3;
   const RETRY_DELAY_MS = 1000;
@@ -23,7 +25,11 @@ export function useSuggestions(settings: Settings) {
    * Throws SyntaxError on 0 valid items (caller retries immediately).
    * 1–3 valid items are returned as-is without placeholders.
    */
-  async function attemptFetch(transcript: string, settings: typeof settingsRef.current): Promise<Suggestion[]> {
+  async function attemptFetch(
+    transcript: string,
+    settings: typeof settingsRef.current,
+    promptOverride?: string,
+  ): Promise<Suggestion[]> {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
 
@@ -34,7 +40,7 @@ export function useSuggestions(settings: Settings) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           transcript,
-          prompt: settings.suggestionsPrompt,
+          prompt: promptOverride ?? settings.suggestionsPrompt,
           contextWords: settings.suggestionsContextWords,
           apiKey: settings.groqApiKey,
         }),
@@ -103,6 +109,15 @@ export function useSuggestions(settings: Settings) {
     const start = Date.now();
     let lastError: unknown;
 
+    // Resolve {PREVIOUS_SUGGESTIONS} placeholder with all previews seen so far
+    const prevText = batchesRef.current.length > 0
+      ? batchesRef.current.flatMap((b) => b.suggestions).map((s) => `- ${s.preview}`).join("\n")
+      : "None yet.";
+    const resolvedPrompt = settingsRef.current.suggestionsPrompt.replace(
+      "{PREVIOUS_SUGGESTIONS}",
+      prevText,
+    );
+
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
       const isParseOrCountError = lastError instanceof SyntaxError;
       if (attempt > 1 && !isParseOrCountError) {
@@ -110,7 +125,23 @@ export function useSuggestions(settings: Settings) {
       }
 
       try {
-        const items = await attemptFetch(transcript, settingsRef.current);
+        let items = await attemptFetch(transcript, settingsRef.current, resolvedPrompt);
+
+        // If partial result, make one fill-up call to reach 3
+        if (items.length < 3) {
+          const needed = 3 - items.length;
+          console.log(`[suggestions] partial (${items.length}) — requesting ${needed} more`);
+          const fillPrompt =
+            resolvedPrompt +
+            `\nYou returned fewer than 3 items. Return exactly ${needed} more unique suggestions in the same JSON array format.`;
+          try {
+            const more = await attemptFetch(transcript, settingsRef.current, fillPrompt);
+            items = [...items, ...more].slice(0, 3);
+          } catch {
+            // accept partial rather than failing entirely
+          }
+        }
+
         console.log(`[suggestions] ${Date.now() - start}ms — ${items.length} suggestions (attempt ${attempt})`);
         const batch: SuggestionBatch = { id: `batch-${++batchId}`, createdAt: Date.now(), suggestions: items };
         setBatches((prev) => [batch, ...prev]);
