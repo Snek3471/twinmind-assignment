@@ -1,7 +1,9 @@
 import Groq from "groq-sdk";
 
+const TRANSCRIPTION_MODEL = "whisper-large-v3";
+
+/** Receive a multipart audio blob and return the Whisper transcription as plain text. */
 export async function POST(req: Request) {
-  const start = Date.now();
   try {
     const formData = await req.formData();
     const audio = formData.get("audio");
@@ -18,11 +20,10 @@ export async function POST(req: Request) {
 
     const transcription = await groq.audio.transcriptions.create({
       file: audio,
-      model: "whisper-large-v3",
+      model: TRANSCRIPTION_MODEL,
       response_format: "text",
     });
 
-    console.log(`[api/transcribe] ${Date.now() - start}ms`);
     return Response.json({ text: transcription });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Transcription error";

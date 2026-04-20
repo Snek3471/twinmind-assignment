@@ -3,6 +3,8 @@
 import { useState, useRef, useCallback } from "react";
 import { ChatMessage, Suggestion, Settings } from "@/lib/types";
 
+const CHAT_TIMEOUT_MS = 45_000;
+
 let msgId = 0;
 function nextMsgId() {
   return `msg-${++msgId}`;
@@ -15,6 +17,22 @@ interface CallOptions {
   isSuggestion?: boolean;
   suggestionType?: string;
   suggestionPreview?: string;
+}
+
+/** Build the rich user-turn content sent to the API when a suggestion card is clicked. */
+function buildSuggestionApiContent(
+  suggestion: Suggestion,
+  trimmedTranscript: string,
+): string {
+  if (trimmedTranscript) {
+    return (
+      `The user is in a live conversation. Here is the full transcript so far:\n\n` +
+      `${trimmedTranscript}\n\n---\n\n` +
+      `Based on this conversation, give a detailed answer to the following suggestion:\n\n` +
+      `Type: ${suggestion.type}\nSuggestion: ${suggestion.preview}`
+    );
+  }
+  return `Give a detailed answer to the following suggestion:\n\nType: ${suggestion.type}\nSuggestion: ${suggestion.preview}`;
 }
 
 export function useChat(fullTranscript: string, settings: Settings) {
@@ -31,15 +49,16 @@ export function useChat(fullTranscript: string, settings: Settings) {
   const isStreamingRef = useRef(isStreaming);
   isStreamingRef.current = isStreaming;
 
-  const CHAT_TIMEOUT_MS = 45_000;
-
+  /**
+   * Core API call: POST to /api/chat with the full message history, stream the response
+   * into the assistant placeholder message, and resolve auth/timeout errors into user-facing strings.
+   */
   const callAPI = useCallback(
     async (
       userMsg: ChatMessage,
       assistantId: string,
       opts: CallOptions
     ) => {
-      const start = Date.now();
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), CHAT_TIMEOUT_MS);
 
@@ -59,8 +78,6 @@ export function useChat(fullTranscript: string, settings: Settings) {
           suggestionPreview: opts.suggestionPreview,
         });
 
-        console.log("[chat] sending request", { isSuggestion: opts.isSuggestion, historyLen: history.length });
-
         const res = await fetch("/api/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -68,11 +85,12 @@ export function useChat(fullTranscript: string, settings: Settings) {
           signal: controller.signal,
         });
 
-        console.log("[chat] response received", { status: res.status, ok: res.ok });
-
         if (!res.ok || !res.body) {
           const err = await res.json().catch(() => ({ error: "Chat failed" }));
-          throw new Error(err.error ?? "Unknown error");
+          const isAuth = res.status === 401 || res.status === 403;
+          throw new Error(isAuth
+            ? "Invalid Groq API key — open Settings to update it."
+            : err.error ?? "Unknown error");
         }
 
         const reader = res.body.getReader();
@@ -90,7 +108,6 @@ export function useChat(fullTranscript: string, settings: Settings) {
           );
         }
 
-        console.log(`[chat] ${Date.now() - start}ms — ${accumulated.length} chars`);
         setMessages((prev) =>
           prev.map((m) => (m.id === assistantId ? { ...m, streaming: false } : m))
         );
@@ -116,6 +133,7 @@ export function useChat(fullTranscript: string, settings: Settings) {
     []
   );
 
+  /** Send a free-form user message to the chat, using a sliding window of the transcript as context. */
   const sendMessage = useCallback(
     async (text: string) => {
       if (!settingsRef.current.groqApiKey) {
@@ -150,7 +168,10 @@ export function useChat(fullTranscript: string, settings: Settings) {
     [callAPI]
   );
 
-  // Dedicated path for suggestion card clicks — uses full transcript + dedicated system prompt
+  /**
+   * Dedicated path for suggestion card clicks — embeds the transcript directly in the user turn
+   * and uses the suggestion detail system prompt instead of the chat prompt.
+   */
   const sendSuggestion = useCallback(
     async (suggestion: Suggestion) => {
       if (!settingsRef.current.groqApiKey) {
@@ -160,14 +181,11 @@ export function useChat(fullTranscript: string, settings: Settings) {
       if (isStreamingRef.current) return;
       setError(null);
 
-      const fullTranscript = transcriptRef.current;
+      const words = transcriptRef.current.split(" ");
+      const trimmedTranscript = words.slice(-settingsRef.current.suggestionDetailContextWords).join(" ");
 
       // What the API receives as the user turn (rich framing)
-      const words = fullTranscript.split(" ");
-      const trimmedTranscript = words.slice(-settingsRef.current.suggestionDetailContextWords).join(" ");
-      const apiContent = trimmedTranscript
-        ? `The user is in a live conversation. Here is the full transcript so far:\n\n${trimmedTranscript}\n\n---\n\nBased on this conversation, give a detailed answer to the following suggestion:\n\nType: ${suggestion.type}\nSuggestion: ${suggestion.preview}`
-        : `Give a detailed answer to the following suggestion:\n\nType: ${suggestion.type}\nSuggestion: ${suggestion.preview}`;
+      const apiContent = buildSuggestionApiContent(suggestion, trimmedTranscript);
 
       // What shows in the chat UI (clean, readable)
       const displayContent = `[${suggestion.type}] ${suggestion.preview}`;

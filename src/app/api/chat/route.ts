@@ -1,8 +1,13 @@
 import Groq from "groq-sdk";
 import { ChatRequestSchema } from "@/lib/schemas";
 
+const MODEL = "openai/gpt-oss-120b";
+const TEMPERATURE = 0.5;
+const MAX_TOKENS_CHAT = 2048;
+const MAX_TOKENS_SUGGESTION = 300;
+
+/** Stream a chat completion from Groq, prepending the transcript to the system prompt when provided. */
 export async function POST(req: Request) {
-  const start = Date.now();
   try {
     const body = await req.json();
     const parsed = ChatRequestSchema.safeParse(body);
@@ -19,14 +24,14 @@ export async function POST(req: Request) {
     const groq = new Groq({ apiKey });
 
     const stream = await groq.chat.completions.create({
-      model: "openai/gpt-oss-120b",
+      model: MODEL,
       messages: [
         { role: "system", content: fullSystem },
         ...messages,
       ],
       stream: true,
-      temperature: 0.5,
-      max_tokens: isSuggestion ? 300 : 2048,
+      temperature: TEMPERATURE,
+      max_tokens: isSuggestion ? MAX_TOKENS_SUGGESTION : MAX_TOKENS_CHAT,
     });
 
     const encoder = new TextEncoder();
@@ -39,7 +44,6 @@ export async function POST(req: Request) {
               controller.enqueue(encoder.encode(delta));
             }
           }
-          console.log(`[api/chat] ${Date.now() - start}ms`);
         } catch (e) {
           controller.error(e);
         } finally {

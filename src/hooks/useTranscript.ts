@@ -3,6 +3,8 @@
 import { useState, useRef, useCallback } from "react";
 import { TranscriptChunk, RecordingStatus, Settings } from "@/lib/types";
 
+const MIN_BLOB_BYTES = 1000;       // blobs smaller than this are treated as silence
+const DEFAULT_CHUNK_INTERVAL_S = 30; // fallback if suggestionsRefreshInterval is unset
 
 let chunkId = 0;
 function nextId() {
@@ -25,11 +27,12 @@ export function useTranscript(settings: Settings) {
   // Resolved in transcribeBlob's finally block so the caller knows transcription is done.
   const flushResolveRef = useRef<(() => void) | null>(null);
 
+  /** Send an audio blob to the transcription API and append the resulting text as a new chunk. */
   const transcribeBlob = useCallback(async (blob: Blob) => {
     // Capture any pending flush resolve at call time — the ref may change during the async call
     const pendingResolve = flushResolveRef.current;
 
-    if (blob.size < 1000) {
+    if (blob.size < MIN_BLOB_BYTES) {
       // Near-empty chunk (silence) — resolve flush immediately so the caller isn't stuck
       if (pendingResolve) {
         flushResolveRef.current = null;
@@ -38,7 +41,6 @@ export function useTranscript(settings: Settings) {
       return;
     }
 
-    const start = Date.now();
     try {
       const formData = new FormData();
       formData.append("audio", blob, "chunk.webm");
@@ -47,19 +49,24 @@ export function useTranscript(settings: Settings) {
       const res = await fetch("/api/transcribe", { method: "POST", body: formData });
       if (!res.ok) {
         const err = await res.json().catch(() => ({ error: "Transcription failed" }));
-        console.error("[transcribe] error", err);
+        const msg = err.error ?? "Transcription failed";
+        const isAuth = res.status === 401 || res.status === 403;
+        setError(isAuth
+          ? "Invalid Groq API key — open Settings to update it."
+          : `Transcription error: ${msg}`);
         return;
       }
 
       const { text } = await res.json();
-      console.log(`[transcribe] ${Date.now() - start}ms — "${text?.slice(0, 60)}"`);
 
       if (text?.trim()) {
         const chunk: TranscriptChunk = { id: nextId(), text: text.trim(), timestamp: Date.now() };
         setChunks((prev) => [...prev, chunk]);
       }
     } catch (e) {
-      console.error("[transcribe] fetch error", e);
+      setError(e instanceof Error && e.name === "AbortError"
+        ? "Transcription request timed out."
+        : "Transcription failed — check your internet connection.");
     } finally {
       // Always resolve after transcription completes (success, empty result, or error)
       if (pendingResolve) {
@@ -69,6 +76,7 @@ export function useTranscript(settings: Settings) {
     }
   }, []);
 
+  /** Start a new MediaRecorder segment on the given stream and schedule the next chunk rotation. */
   const startChunk = useCallback(
     (stream: MediaStream) => {
       const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
@@ -86,7 +94,7 @@ export function useTranscript(settings: Settings) {
 
       recorder.start();
 
-      const intervalMs = (settingsRef.current.suggestionsRefreshInterval ?? 30) * 1000;
+      const intervalMs = (settingsRef.current.suggestionsRefreshInterval ?? DEFAULT_CHUNK_INTERVAL_S) * 1000;
       chunkTimerRef.current = setTimeout(() => {
         if (recorder.state !== "inactive") recorder.stop();
         if (isRecordingRef.current) startChunk(stream);
@@ -95,6 +103,7 @@ export function useTranscript(settings: Settings) {
     [transcribeBlob]
   );
 
+  /** Request microphone access and begin the recording + chunking loop. */
   const startRecording = useCallback(async () => {
     setError(null);
     if (!settingsRef.current.groqApiKey) {
@@ -117,6 +126,7 @@ export function useTranscript(settings: Settings) {
     }
   }, [startChunk]);
 
+  /** Stop all recording, cancel timers, and release the microphone track. */
   const stopRecording = useCallback(() => {
     isRecordingRef.current = false;
     if (chunkTimerRef.current) {

@@ -3,6 +3,12 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { Suggestion, SuggestionBatch, Settings } from "@/lib/types";
 
+const MAX_ATTEMPTS = 3;
+const RETRY_DELAY_MS = 1000;
+const FETCH_TIMEOUT_MS = 10_000;
+const SUGGESTIONS_PER_BATCH = 3;
+const ERROR_CLEAR_MS = 5000;
+
 let batchId = 0;
 let suggestionId = 0;
 
@@ -16,14 +22,10 @@ export function useSuggestions(settings: Settings) {
   const batchesRef = useRef(batches);
   batchesRef.current = batches;
 
-  const MAX_ATTEMPTS = 3;
-  const RETRY_DELAY_MS = 1000;
-  const FETCH_TIMEOUT_MS = 10_000;
-
   /**
-   * Single attempt: fetch → validate items → return suggestions or throw.
-   * Throws SyntaxError on 0 valid items (caller retries immediately).
-   * 1–3 valid items are returned as-is without placeholders.
+   * Single attempt: POST to /api/suggestions, validate items, return suggestions or throw.
+   * Throws SyntaxError on 0 valid items so the caller retries immediately.
+   * 1–3 valid items are returned as-is.
    */
   async function attemptFetch(
     transcript: string,
@@ -52,7 +54,10 @@ export function useSuggestions(settings: Settings) {
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
-      throw new Error(err.error ?? `HTTP ${res.status}`);
+      const isAuth = res.status === 401 || res.status === 403;
+      throw new Error(isAuth
+        ? "Invalid Groq API key — open Settings to update it."
+        : err.error ?? `HTTP ${res.status}`);
     }
 
     // res.json() throws SyntaxError on malformed body — caller retries immediately
@@ -75,7 +80,7 @@ export function useSuggestions(settings: Settings) {
     }
 
     // 1–3 valid items accepted as-is — no retry for partial results
-    return raw.slice(0, 3).map((s) => ({
+    return raw.slice(0, SUGGESTIONS_PER_BATCH).map((s) => ({
       id: `s-${++suggestionId}`,
       type: s.type,
       preview: s.preview,
@@ -91,8 +96,7 @@ export function useSuggestions(settings: Settings) {
    * Retries up to MAX_ATTEMPTS times:
    *   - SyntaxError / count failures → retry immediately (no delay)
    *   - Network / HTTP errors → wait RETRY_DELAY_MS between attempts
-   * After all retries exhausted, fills remaining slots with placeholder cards
-   * so the UI is never empty or broken.
+   * If < SUGGESTIONS_PER_BATCH items returned, makes one fill-up call before committing.
    */
   const fetchSuggestions = useCallback(async (transcript: string) => {
     if (!transcript.trim()) {
@@ -106,7 +110,6 @@ export function useSuggestions(settings: Settings) {
 
     setIsLoading(true);
     setError(null);
-    const start = Date.now();
     let lastError: unknown;
 
     // Resolve {PREVIOUS_SUGGESTIONS} placeholder with all previews seen so far
@@ -127,44 +130,44 @@ export function useSuggestions(settings: Settings) {
       try {
         let items = await attemptFetch(transcript, settingsRef.current, resolvedPrompt);
 
-        // If partial result, make one fill-up call to reach 3
-        if (items.length < 3) {
-          const needed = 3 - items.length;
-          console.log(`[suggestions] partial (${items.length}) — requesting ${needed} more`);
+        // If partial result, make one fill-up call to reach SUGGESTIONS_PER_BATCH
+        if (items.length < SUGGESTIONS_PER_BATCH) {
+          const needed = SUGGESTIONS_PER_BATCH - items.length;
           const fillPrompt =
             resolvedPrompt +
-            `\nYou returned fewer than 3 items. Return exactly ${needed} more unique suggestions in the same JSON array format.`;
+            `\nYou returned fewer than ${SUGGESTIONS_PER_BATCH} items. Return exactly ${needed} more unique suggestions in the same JSON array format.`;
           try {
             const more = await attemptFetch(transcript, settingsRef.current, fillPrompt);
-            items = [...items, ...more].slice(0, 3);
+            items = [...items, ...more].slice(0, SUGGESTIONS_PER_BATCH);
           } catch {
             // accept partial rather than failing entirely
           }
         }
 
-        console.log(`[suggestions] ${Date.now() - start}ms — ${items.length} suggestions (attempt ${attempt})`);
         const batch: SuggestionBatch = { id: `batch-${++batchId}`, createdAt: Date.now(), suggestions: items };
         setBatches((prev) => [batch, ...prev]);
         setIsLoading(false);
         return;
       } catch (e) {
         lastError = e;
-        console.warn(`[suggestions] attempt ${attempt}/${MAX_ATTEMPTS} failed:`, e);
       }
     }
 
     // All attempts exhausted — keep previous batches, show transient error
-    console.error("[suggestions] all attempts failed, last error:", lastError);
-    setError("Failed to load suggestions — tap refresh to try again.");
+    const authFailed = lastError instanceof Error &&
+      lastError.message.includes("Invalid Groq API key");
+    setError(authFailed
+      ? (lastError as Error).message
+      : "Failed to load suggestions — tap refresh to try again.");
     setIsLoading(false);
   }, []);
 
-  // Auto-clear error after 5s (toast behavior)
+  // Auto-clear error after ERROR_CLEAR_MS (toast behavior)
   const errorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     if (!error) return;
     if (errorTimerRef.current) clearTimeout(errorTimerRef.current);
-    errorTimerRef.current = setTimeout(() => setError(null), 5000);
+    errorTimerRef.current = setTimeout(() => setError(null), ERROR_CLEAR_MS);
     return () => {
       if (errorTimerRef.current) clearTimeout(errorTimerRef.current);
     };

@@ -1,6 +1,10 @@
 import Groq from "groq-sdk";
 import { SuggestionsRequestSchema, SuggestionItemSchema } from "@/lib/schemas";
 
+const MODEL = "openai/gpt-oss-120b";
+const TEMPERATURE = 0.3;
+const MAX_TOKENS = 1024;
+
 const SYSTEM_PROMPT_SUFFIX =
   "\n\nYou MUST return exactly 3 objects. Never return fewer. Never wrap in markdown.";
 
@@ -32,8 +36,8 @@ function extractObjects(text: string): unknown[] {
   return results;
 }
 
+/** Strip markdown fences and parse the model's raw text as JSON, with multiple fallback strategies. */
 function cleanAndParse(raw: string): unknown {
-  // Strip markdown fences and stray backticks, then trim
   const cleaned = raw
     .replace(/```json\s*/gi, "")
     .replace(/```\s*/g, "")
@@ -61,8 +65,8 @@ function cleanAndParse(raw: string): unknown {
   }
 }
 
+/** Accept a transcript + prompt, call the Groq model, and return up to 3 validated suggestion items. */
 export async function POST(req: Request) {
-  const start = Date.now();
   try {
     const body = await req.json();
     const parsed = SuggestionsRequestSchema.safeParse(body);
@@ -78,7 +82,7 @@ export async function POST(req: Request) {
     const groq = new Groq({ apiKey });
 
     const completion = await groq.chat.completions.create({
-      model: "openai/gpt-oss-120b",
+      model: MODEL,
       messages: [
         { role: "system", content: prompt + SYSTEM_PROMPT_SUFFIX },
         {
@@ -86,12 +90,11 @@ export async function POST(req: Request) {
           content: `Here is the recent meeting transcript (last ~${contextWords} words):\n\n${context}\n\nGenerate exactly 3 suggestions as specified.`,
         },
       ],
-      temperature: 0.3,
-      max_tokens: 1024,
+      temperature: TEMPERATURE,
+      max_tokens: MAX_TOKENS,
     });
 
     const rawText = completion.choices[0]?.message?.content ?? "";
-    console.log("RAW SUGGESTION RESPONSE:", rawText);
 
     let parsed2: unknown;
     try {
@@ -115,13 +118,9 @@ export async function POST(req: Request) {
     // the client decides whether to retry based on count.
     const suggestions = candidates.flatMap((item) => {
       const r = SuggestionItemSchema.safeParse(item);
-      if (!r.success) {
-        console.warn("[api/suggestions] item failed schema:", r.error.message, item);
-      }
       return r.success ? [r.data] : [];
     });
 
-    console.log(`[api/suggestions] ${Date.now() - start}ms — ${suggestions.length}/3 valid items`);
     return Response.json({ suggestions });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Suggestions error";
