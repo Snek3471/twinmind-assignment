@@ -62,7 +62,7 @@ export function SettingsModal({ settings, onSave, onClose }: SettingsModalProps)
             </p>
           </div>
 
-          {/* Context window sizes */}
+          {/* Context window + refresh interval */}
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
@@ -74,6 +74,32 @@ export function SettingsModal({ settings, onSave, onClose }: SettingsModalProps)
                 max={4000}
                 value={draft.suggestionsContextWords}
                 onChange={(e) => patch("suggestionsContextWords", Number(e.target.value))}
+                className="w-full bg-[#13141a] border border-[#2a2d3a] rounded-lg px-3.5 py-2.5 text-sm text-gray-200 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
+                Suggestions refresh (seconds)
+              </label>
+              <input
+                type="number"
+                min={10}
+                max={120}
+                value={draft.suggestionsRefreshInterval}
+                onChange={(e) => patch("suggestionsRefreshInterval", Number(e.target.value))}
+                className="w-full bg-[#13141a] border border-[#2a2d3a] rounded-lg px-3.5 py-2.5 text-sm text-gray-200 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
+                Click-answer context (words)
+              </label>
+              <input
+                type="number"
+                min={100}
+                max={8000}
+                value={draft.suggestionDetailContextWords}
+                onChange={(e) => patch("suggestionDetailContextWords", Number(e.target.value))}
                 className="w-full bg-[#13141a] border border-[#2a2d3a] rounded-lg px-3.5 py-2.5 text-sm text-gray-200 focus:outline-none focus:ring-1 focus:ring-indigo-500"
               />
             </div>
@@ -105,10 +131,24 @@ export function SettingsModal({ settings, onSave, onClose }: SettingsModalProps)
             />
           </div>
 
+          {/* Suggestion detail prompt */}
+          <div>
+            <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
+              Detailed Answer System Prompt
+            </label>
+            <p className="text-[10px] text-gray-600 mb-2">Used when you click a suggestion card to expand it.</p>
+            <textarea
+              rows={6}
+              value={draft.suggestionDetailPrompt}
+              onChange={(e) => patch("suggestionDetailPrompt", e.target.value)}
+              className="w-full bg-[#13141a] border border-[#2a2d3a] rounded-lg px-3.5 py-2.5 text-xs text-gray-300 font-mono leading-relaxed focus:outline-none focus:ring-1 focus:ring-indigo-500 resize-y"
+            />
+          </div>
+
           {/* Chat prompt */}
           <div>
             <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
-              Chat Answer System Prompt
+              Chat System Prompt
             </label>
             <textarea
               rows={6}

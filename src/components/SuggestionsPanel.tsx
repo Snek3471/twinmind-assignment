@@ -1,16 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Suggestion, SuggestionBatch, SuggestionType } from "@/lib/types";
 
 interface SuggestionsPanelProps {
   batches: SuggestionBatch[];
   batchCount: number;
   isLoading: boolean;
+  isRecording: boolean;
   error: string | null;
-  lastTranscriptAt: number | null; // timestamp of last transcript chunk — drives the "Xs since last update" counter
   activeSuggestionId: string | null;
-  onReload: () => void;
+  onReload: () => Promise<void>;
   onSelectSuggestion: (suggestion: Suggestion) => void;
 }
 
@@ -80,29 +80,49 @@ function SuggestionCard({
   );
 }
 
+type ButtonPhase = "idle" | "transcribing" | "generating";
+
 export function SuggestionsPanel({
   batches,
   batchCount,
   isLoading,
+  isRecording,
   error,
-  lastTranscriptAt,
   activeSuggestionId,
   onReload,
   onSelectSuggestion,
 }: SuggestionsPanelProps) {
-  // Count seconds since the last transcript update — resets whenever a new chunk arrives
-  const [secondsSince, setSecondsSince] = useState(0);
+
+  // Track button phase across the two-step reload sequence
+  const [localBusy, setLocalBusy] = useState(false);
+  const prevIsLoadingRef = useRef(isLoading);
+
+  // Once isLoading transitions true→false while localBusy, sequence is done
   useEffect(() => {
-    if (!lastTranscriptAt) {
-      setSecondsSince(0);
-      return;
+    prevIsLoadingRef.current = isLoading;
+  });
+
+  const phase: ButtonPhase = localBusy && !isLoading
+    ? "transcribing"
+    : isLoading
+    ? "generating"
+    : "idle";
+
+  const buttonDisabled = !isRecording || localBusy || isLoading;
+
+  async function handleRefreshClick() {
+    setLocalBusy(true);
+    try {
+      await onReload();
+    } finally {
+      setLocalBusy(false);
     }
-    setSecondsSince(Math.floor((Date.now() - lastTranscriptAt) / 1000));
-    const interval = setInterval(() => {
-      setSecondsSince(Math.floor((Date.now() - lastTranscriptAt) / 1000));
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [lastTranscriptAt]);
+  }
+
+  const buttonLabel =
+    phase === "transcribing" ? "Transcribing..." :
+    phase === "generating"   ? "Generating..."   :
+    "Refresh";
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -112,84 +132,75 @@ export function SuggestionsPanel({
           2. Live Suggestions
         </h2>
         <span className="text-[10px] font-bold text-gray-500">
-          {batchCount} {batchCount === 1 ? "BATCH" : "BATCHES"}
+          {batchCount > 0 ? `${batchCount} ${batchCount === 1 ? "BATCH" : "BATCHES"}` : ""}
         </span>
       </div>
 
-      {/* Sub-header */}
-      <div className="flex items-center justify-between px-4 py-2 border-b border-[#1e2130] flex-shrink-0">
+      {/* Centered refresh pill */}
+      <div className="flex flex-col items-center gap-1 px-4 py-3 border-b border-[#1e2130] flex-shrink-0">
         <button
-          onClick={onReload}
-          disabled={isLoading}
-          className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          onClick={handleRefreshClick}
+          disabled={buttonDisabled}
+          className={`flex items-center gap-2 px-5 py-1.5 rounded-full text-xs font-semibold transition-all border focus:outline-none focus:ring-1 focus:ring-indigo-500/60 ${
+            buttonDisabled
+              ? "border-[#2a2d3a] bg-[#191b26] text-gray-600 cursor-not-allowed opacity-50"
+              : "border-indigo-500/40 bg-indigo-500/10 text-indigo-300 hover:bg-indigo-500/20 hover:border-indigo-500/60"
+          }`}
         >
           <svg
-            className={`w-3.5 h-3.5 ${isLoading ? "animate-spin" : ""}`}
+            className={`w-3 h-3 flex-shrink-0 ${phase !== "idle" ? "animate-spin" : ""}`}
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
             strokeWidth={2.5}
           >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-            />
+            <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
           </svg>
-          {isLoading ? "Loading..." : "Reload suggestions"}
+          {buttonLabel}
         </button>
         <span className="text-[10px] text-gray-600">
-          {lastTranscriptAt
-            ? `updated ${secondsSince}s ago`
-            : "auto-refreshes after each transcript"}
+          {!isRecording
+            ? "start mic to enable"
+            : phase !== "idle"
+            ? "running..."
+            : "auto-refreshes after each transcript chunk"}
         </span>
       </div>
 
-      {/* Content */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-6 min-h-0">
-        {/* Info callout */}
-        <div className="rounded-md bg-[#1e2130] border border-[#2a2d3a] px-3 py-2.5 text-xs text-gray-400 leading-relaxed">
-          Auto-generates{" "}
-          <strong className="text-gray-300">3 fresh suggestions</strong> after each new
-          transcript chunk (~30s). New batch at top; older batches push down (faded). Each is a tappable card: a{" "}
-          <span className="text-blue-400">question</span>,{" "}
-          <span className="text-emerald-400">talking-point</span>,{" "}
-          <span className="text-purple-400">answer</span>,{" "}
-          <span className="text-amber-400">fact-check</span>, or{" "}
-          <span className="text-cyan-400">clarification</span>.
-        </div>
-
-        {/* Error */}
+      {/* Content — always shows the 3 latest suggestions, replacing on each refresh */}
+      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3 min-h-0">
+        {/* Error toast — auto-dismissed after 5s */}
         {error && (
-          <div className="rounded-md bg-red-900/20 border border-red-700/40 px-3 py-2.5 text-xs text-red-400">
+          <div className="rounded-md bg-red-900/15 border border-red-700/30 px-3 py-2 text-[11px] text-red-400/90 flex items-center gap-2">
+            <svg className="w-3 h-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+            </svg>
             {error}
           </div>
         )}
 
         {/* Loading skeleton */}
-        {isLoading && batches.length === 0 && (
-          <div className="space-y-2">
+        {isLoading && (
+          <div className="space-y-3">
             {[1, 2, 3].map((i) => (
-              <div
-                key={i}
-                className="h-20 rounded-lg bg-[#191b26] border border-[#2a2d3a] animate-pulse"
-              />
+              <div key={i} className="h-20 rounded-lg bg-[#191b26] border border-[#2a2d3a] animate-pulse" />
             ))}
           </div>
         )}
 
-        {/* Batches */}
-        {batches.length === 0 && !isLoading && (
+        {/* Empty state */}
+        {!isLoading && batches.length === 0 && (
           <p className="text-sm text-gray-600 text-center mt-8">
             Suggestions appear here once recording starts.
           </p>
         )}
 
-        {batches.map((batch, batchIndex) => (
+        {/* Stacked batches — newest on top, older ones faded */}
+        {!isLoading && batches.map((batch, batchIndex) => (
           <div key={batch.id} className="space-y-2">
             {batchIndex > 0 && (
               <p className="text-[10px] text-gray-700 text-center py-1">
-                Earlier batch — {new Date(batch.createdAt).toLocaleTimeString()}
+                {new Date(batch.createdAt).toLocaleTimeString()}
               </p>
             )}
             {batch.suggestions.map((s) => (

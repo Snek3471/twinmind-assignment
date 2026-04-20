@@ -35,11 +35,16 @@ const STATUS_COLOR: Record<RecordingStatus, string> = {
 };
 
 export function TranscriptPanel({ status, chunks, error, onStart, onStop, onExport }: TranscriptPanelProps) {
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const isRecording = status === "recording";
 
+  // Scroll the container div itself to its scrollHeight whenever chunks update.
+  // scrollIntoView on a sentinel child is unreliable inside overflow-y-auto containers.
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    const el = scrollContainerRef.current;
+    if (el) {
+      el.scrollTop = el.scrollHeight;
+    }
   }, [chunks]);
 
   return (
@@ -94,7 +99,7 @@ export function TranscriptPanel({ status, chunks, error, onStart, onStop, onExpo
       </div>
 
       {/* Scrollable transcript area */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4 min-h-0">
+      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-4 min-h-0">
         {/* Info callout */}
         <div className="rounded-md bg-[#1e2130] border border-[#2a2d3a] px-3 py-2.5 text-xs text-gray-400 leading-relaxed">
           The transcript scrolls and appends new chunks every ~30 seconds while recording. Use the mic button to start/stop. Use the export button to download the full session as JSON.
@@ -131,7 +136,6 @@ export function TranscriptPanel({ status, chunks, error, onStart, onStop, onExpo
           </div>
         )}
 
-        <div ref={bottomRef} />
       </div>
     </div>
   );

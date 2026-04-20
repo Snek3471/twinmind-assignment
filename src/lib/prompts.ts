@@ -1,6 +1,8 @@
 import { Settings } from "./types";
 
-export const DEFAULT_SUGGESTIONS_PROMPT = `You are an AI meeting copilot. Your job is to analyze the last portion of a live meeting transcript and surface the 3 most immediately useful interventions.
+export const DEFAULT_SUGGESTIONS_PROMPT = `CRITICAL: Respond with a valid JSON array ONLY. No markdown, no backticks, no explanation, no text before or after. Start your response with [ and end with ].
+
+You are an AI meeting copilot. Your job is to analyze the last portion of a live meeting transcript and surface the 3 most immediately useful interventions.
 
 Identify the right mix of help types based on what is happening right now:
 - "question": a specific question worth asking the other party to move the conversation forward
@@ -13,28 +15,25 @@ Rules:
 - The 3 cards can be any mix of the above types — choose what would actually be most useful given the conversation
 - Each "preview" must be 1-2 sentences and self-contained — useful to read without clicking
 - Each "detail_prompt" should be an expanded, context-rich prompt that will produce a thorough answer when sent to a language model
-- Return ONLY valid JSON, no explanation text, no markdown fences
 
 Output format (strict — use exactly these type values with hyphens):
-{
-  "suggestions": [
-    {
-      "type": "question",
-      "preview": "...",
-      "detail_prompt": "..."
-    },
-    {
-      "type": "talking-point",
-      "preview": "...",
-      "detail_prompt": "..."
-    },
-    {
-      "type": "fact-check",
-      "preview": "...",
-      "detail_prompt": "..."
-    }
-  ]
-}`;
+[
+  {
+    "type": "question",
+    "preview": "...",
+    "detail_prompt": "..."
+  },
+  {
+    "type": "talking-point",
+    "preview": "...",
+    "detail_prompt": "..."
+  },
+  {
+    "type": "fact-check",
+    "preview": "...",
+    "detail_prompt": "..."
+  }
+]`;
 
 export const SUGGESTION_DETAIL_SYSTEM_PROMPT = `You are a concise AI assistant supporting someone in a live meeting. Answer in 3-5 sentences max, or a bullet list of 3-4 points if the topic warrants structure. No preamble. No "Based on the transcript...". Get straight to the point.
 
@@ -60,9 +59,12 @@ Your role:
 export const DEFAULT_SETTINGS: Settings = {
   groqApiKey: "",
   suggestionsPrompt: DEFAULT_SUGGESTIONS_PROMPT,
+  suggestionDetailPrompt: SUGGESTION_DETAIL_SYSTEM_PROMPT,
   chatPrompt: DEFAULT_CHAT_PROMPT,
   suggestionsContextWords: 400,
+  suggestionDetailContextWords: 2000,
   chatContextWords: 2000,
+  suggestionsRefreshInterval: 30,
 };
 
 export const SETTINGS_STORAGE_KEY = "twinmind_settings";

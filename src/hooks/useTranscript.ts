@@ -3,7 +3,6 @@
 import { useState, useRef, useCallback } from "react";
 import { TranscriptChunk, RecordingStatus, Settings } from "@/lib/types";
 
-const CHUNK_INTERVAL_MS = 30_000;
 
 let chunkId = 0;
 function nextId() {
@@ -87,10 +86,11 @@ export function useTranscript(settings: Settings) {
 
       recorder.start();
 
+      const intervalMs = (settingsRef.current.suggestionsRefreshInterval ?? 30) * 1000;
       chunkTimerRef.current = setTimeout(() => {
         if (recorder.state !== "inactive") recorder.stop();
         if (isRecordingRef.current) startChunk(stream);
-      }, CHUNK_INTERVAL_MS);
+      }, intervalMs);
     },
     [transcribeBlob]
   );

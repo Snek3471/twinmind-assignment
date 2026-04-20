@@ -2,7 +2,6 @@
 
 import { useState, useRef, useCallback } from "react";
 import { ChatMessage, Suggestion, Settings } from "@/lib/types";
-import { SUGGESTION_DETAIL_SYSTEM_PROMPT } from "@/lib/prompts";
 
 let msgId = 0;
 function nextMsgId() {
@@ -149,8 +148,10 @@ export function useChat(fullTranscript: string, settings: Settings) {
       const fullTranscript = transcriptRef.current;
 
       // What the API receives as the user turn (rich framing)
-      const apiContent = fullTranscript
-        ? `The user is in a live conversation. Here is the full transcript so far:\n\n${fullTranscript}\n\n---\n\nBased on this conversation, give a detailed answer to the following suggestion:\n\nType: ${suggestion.type}\nSuggestion: ${suggestion.preview}`
+      const words = fullTranscript.split(" ");
+      const trimmedTranscript = words.slice(-settingsRef.current.suggestionDetailContextWords).join(" ");
+      const apiContent = trimmedTranscript
+        ? `The user is in a live conversation. Here is the full transcript so far:\n\n${trimmedTranscript}\n\n---\n\nBased on this conversation, give a detailed answer to the following suggestion:\n\nType: ${suggestion.type}\nSuggestion: ${suggestion.preview}`
         : `Give a detailed answer to the following suggestion:\n\nType: ${suggestion.type}\nSuggestion: ${suggestion.preview}`;
 
       // What shows in the chat UI (clean, readable)
@@ -172,7 +173,7 @@ export function useChat(fullTranscript: string, settings: Settings) {
       setIsStreaming(true);
 
       await callAPI(userMsg, assistantId, {
-        systemPrompt: SUGGESTION_DETAIL_SYSTEM_PROMPT,
+        systemPrompt: settingsRef.current.suggestionDetailPrompt,
         transcriptContext: "", // already embedded in apiContent — don't duplicate
         isSuggestion: true,
         suggestionType: suggestion.type,

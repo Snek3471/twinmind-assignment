@@ -32,9 +32,12 @@ export interface ChatMessage {
 export interface Settings {
   groqApiKey: string;
   suggestionsPrompt: string;
+  suggestionDetailPrompt: string;
   chatPrompt: string;
   suggestionsContextWords: number;
+  suggestionDetailContextWords: number;
   chatContextWords: number;
+  suggestionsRefreshInterval: number; // seconds — controls MediaRecorder restart cycle
 }
 
 export type RecordingStatus = "idle" | "recording" | "processing" | "error";

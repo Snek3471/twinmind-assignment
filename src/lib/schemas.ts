@@ -17,9 +17,7 @@ export const SuggestionItemSchema = z.object({
   detail_prompt: z.string().min(1).max(2000),
 });
 
-export const SuggestionsResponseSchema = z.object({
-  suggestions: z.array(SuggestionItemSchema).length(3),
-});
+export const SuggestionsResponseSchema = z.array(SuggestionItemSchema);
 
 export const TranscribeRequestSchema = z.object({
   apiKey: z.string().min(1),
@@ -47,4 +45,4 @@ export const ChatRequestSchema = z.object({
   suggestionPreview: z.string().optional(),
 });
 
-export type SuggestionsResponse = z.infer<typeof SuggestionsResponseSchema>;
+export type SuggestionsResponseItems = z.infer<typeof SuggestionsResponseSchema>;
