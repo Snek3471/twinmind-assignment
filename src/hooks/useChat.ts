@@ -31,6 +31,8 @@ export function useChat(fullTranscript: string, settings: Settings) {
   const isStreamingRef = useRef(isStreaming);
   isStreamingRef.current = isStreaming;
 
+  const CHAT_TIMEOUT_MS = 45_000;
+
   const callAPI = useCallback(
     async (
       userMsg: ChatMessage,
@@ -38,26 +40,35 @@ export function useChat(fullTranscript: string, settings: Settings) {
       opts: CallOptions
     ) => {
       const start = Date.now();
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), CHAT_TIMEOUT_MS);
+
       try {
-        // API history uses content (which may be the full framed message for suggestions)
         const history = [...messagesRef.current, userMsg].map((m) => ({
           role: m.role,
           content: m.content,
         }));
 
+        const body = JSON.stringify({
+          messages: history,
+          systemPrompt: opts.systemPrompt,
+          transcriptContext: opts.transcriptContext,
+          apiKey: settingsRef.current.groqApiKey,
+          isSuggestion: opts.isSuggestion,
+          suggestionType: opts.suggestionType,
+          suggestionPreview: opts.suggestionPreview,
+        });
+
+        console.log("[chat] sending request", { isSuggestion: opts.isSuggestion, historyLen: history.length });
+
         const res = await fetch("/api/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            messages: history,
-            systemPrompt: opts.systemPrompt,
-            transcriptContext: opts.transcriptContext,
-            apiKey: settingsRef.current.groqApiKey,
-            isSuggestion: opts.isSuggestion,
-            suggestionType: opts.suggestionType,
-            suggestionPreview: opts.suggestionPreview,
-          }),
+          body,
+          signal: controller.signal,
         });
+
+        console.log("[chat] response received", { status: res.status, ok: res.ok });
 
         if (!res.ok || !res.body) {
           const err = await res.json().catch(() => ({ error: "Chat failed" }));
@@ -84,7 +95,11 @@ export function useChat(fullTranscript: string, settings: Settings) {
           prev.map((m) => (m.id === assistantId ? { ...m, streaming: false } : m))
         );
       } catch (e) {
-        const msg = e instanceof Error ? e.message : "Chat request failed";
+        const isTimeout = e instanceof DOMException && e.name === "AbortError";
+        const msg = isTimeout
+          ? "Request timed out — please try again."
+          : e instanceof Error ? e.message : "Chat request failed";
+        console.error("[chat] error", e);
         setError(msg);
         setMessages((prev) =>
           prev.map((m) =>
@@ -93,8 +108,8 @@ export function useChat(fullTranscript: string, settings: Settings) {
               : m
           )
         );
-        console.error("[chat] error", e);
       } finally {
+        clearTimeout(timeoutId);
         setIsStreaming(false);
       }
     },
