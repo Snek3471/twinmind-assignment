@@ -45,7 +45,7 @@ export default function Home() {
   } = useChat(fullTranscript, settings);
 
   // Single call site for suggestions: fires whenever a new chunk is committed to state.
-  // Covers both the automatic 30s MediaRecorder cycle and manual flush via handleReload.
+  // Covers both the automatic MediaRecorder cycle and manual flush via handleReload.
   const prevChunkCountRef = useRef(0);
   useEffect(() => {
     if (chunks.length > prevChunkCountRef.current) {
@@ -85,73 +85,75 @@ export default function Home() {
 
   if (!loaded) {
     return (
-      <div className="h-screen bg-[#13141a] flex items-center justify-center">
-        <div className="w-5 h-5 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+      <div className="h-screen bg-background flex items-center justify-center">
+        <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="h-screen bg-[#13141a] text-gray-100 flex flex-col overflow-hidden">
-      {/* Top bar */}
-      <header className="flex items-center justify-between px-5 py-2.5 border-b border-[#2a2d3a] flex-shrink-0 bg-[#13141a]">
-        <div className="flex items-center gap-2.5">
-          <div className="w-5 h-5 rounded bg-indigo-600 flex items-center justify-center flex-shrink-0">
-            <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M12 1a4 4 0 0 1 4 4v6a4 4 0 0 1-8 0V5a4 4 0 0 1 4-4z" />
-            </svg>
+    <div className="h-screen w-screen flex flex-col overflow-hidden bg-background text-on-surface">
+      {/* Top nav bar */}
+      <header className="bg-background border-b border-white/10 flex justify-between items-center h-16 px-6 w-full z-50 flex-shrink-0">
+        <div className="flex items-center gap-4">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            alt="TwinMind Logo"
+            className="h-8 w-8 rounded-md object-contain"
+            src="https://lh3.googleusercontent.com/aida/ADBb0uirQA1WAWEKGP-ead2EzuHYEn_sfPty4XZg_J6Jc1c_dS6PcvGqfoatIMyRHS0tGOINpJWqGnobiFFJXX5iMQmZbO_-3BKbJZyu2WFI9BXZ9sAyHDrobZP983S76r8zjVHcL5J6DFK-HT3cR0xMTRIY_GbmOjHZuByL0DbPiO9rc0ZHyBo0KYZoYLrDRRwYd8ySroJaGVqNu63zOhpSheDqmyiIOmfbyeaDEyE15t60NhK3WuHPlEgI7vIXgE2LXmdXtDGiC-IMyQ"
+            onError={(e) => {
+              const el = e.currentTarget;
+              el.style.display = "none";
+              const fallback = el.nextElementSibling as HTMLElement | null;
+              if (fallback) fallback.style.display = "flex";
+            }}
+          />
+          {/* Fallback icon shown if logo URL fails to load */}
+          <div
+            className="h-8 w-8 rounded-md bg-gradient-to-br from-blue-600 to-blue-800 flex items-center justify-center text-white font-black text-xs hidden"
+            aria-hidden="true"
+          >
+            TM
           </div>
-          <span className="text-sm font-semibold text-gray-100">TwinMind</span>
-          <span className="text-xs text-gray-600 hidden sm:block">— Live Suggestions Web App</span>
+          <div className="h-4 w-px bg-white/10" />
+          <span className="text-sm font-medium text-on-surface-variant">Live Suggestions</span>
         </div>
 
-        <div className="flex items-center gap-2">
-          <span className="text-[10px] text-gray-600 hidden sm:block">
-            3-column layout · Transcript · Live Suggestions · Chat
-          </span>
+        <nav className="hidden md:flex items-center gap-8 h-full">
+          <a
+            className="text-primary font-semibold border-b-2 border-primary pb-1 h-full flex items-center mt-0.5"
+            href="#"
+          >
+            Live Suggestions
+          </a>
+        </nav>
+
+        <div className="flex items-center gap-4">
+          <button
+            onClick={handleExport}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-lg border-subtle hover:bg-white/5 transition-all active:scale-95 text-on-surface-variant"
+          >
+            <span className="material-symbols-outlined text-[20px]">download</span>
+            <span className="text-column-header">EXPORT</span>
+          </button>
           <button
             onClick={() => setShowSettings(true)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs transition-colors border ${
-              !settings.groqApiKey
-                ? "text-amber-400 border-amber-700/50 bg-amber-900/20 hover:bg-amber-900/30"
-                : "text-gray-400 border-[#2a2d3a] hover:text-gray-200 hover:bg-[#1e2130]"
-            }`}
+            className="p-2 rounded-lg hover:bg-white/5 transition-all active:scale-95 text-on-surface-variant"
+            aria-label="Open settings"
           >
-            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
-            {!settings.groqApiKey ? "Add API Key" : "Settings"}
+            <span className="material-symbols-outlined text-[20px]">settings</span>
           </button>
         </div>
       </header>
 
-      {/* No API key banner */}
-      {!settings.groqApiKey && (
-        <div className="flex items-center gap-2 px-5 py-2 bg-amber-900/20 border-b border-amber-700/30 flex-shrink-0">
-          <svg className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-            <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-          </svg>
-          <p className="text-xs text-amber-300">
-            No Groq API key configured.{" "}
-            <button onClick={() => setShowSettings(true)} className="underline hover:text-amber-200">
-              Open Settings
-            </button>{" "}
-            to paste your key. Get one free at{" "}
-            <span className="font-mono">console.groq.com</span>.
-          </p>
-        </div>
-      )}
-
-      {/* 3-panel layout — flex-1 min-h-0 overflow-hidden locks columns to remaining viewport height */}
-      <div className="flex-1 min-h-0 overflow-hidden grid grid-cols-3 divide-x divide-[#2a2d3a]">
+      {/* Three-column workspace */}
+      <main className="flex-1 flex overflow-hidden">
         <TranscriptPanel
           status={status}
           chunks={chunks}
           error={transcriptError}
           onStart={startRecording}
           onStop={stopRecording}
-          onExport={handleExport}
         />
 
         <SuggestionsPanel
@@ -161,6 +163,7 @@ export default function Home() {
           isRecording={isRecording}
           error={suggestionsError}
           activeSuggestionId={activeSuggestionId}
+          refreshIntervalS={settings.suggestionsRefreshInterval ?? 30}
           onReload={handleReload}
           onSelectSuggestion={handleSelectSuggestion}
         />
@@ -174,7 +177,7 @@ export default function Home() {
           onSendSuggestion={sendSuggestion}
           onClearPendingSuggestion={() => setPendingSuggestion(null)}
         />
-      </div>
+      </main>
 
       {showSettings && (
         <SettingsModal

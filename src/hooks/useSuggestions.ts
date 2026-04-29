@@ -99,10 +99,7 @@ export function useSuggestions(settings: Settings) {
    * If < SUGGESTIONS_PER_BATCH items returned, makes one fill-up call before committing.
    */
   const fetchSuggestions = useCallback(async (transcript: string) => {
-    if (!transcript.trim()) {
-      setError("Start speaking to generate suggestions.");
-      return;
-    }
+    if (!transcript.trim()) return;
     if (!settingsRef.current.groqApiKey) {
       setError("No API key — open Settings.");
       return;
