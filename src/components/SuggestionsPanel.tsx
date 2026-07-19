@@ -68,10 +68,21 @@ function SuggestionCard({
 }) {
   const cfg = TYPE_CONFIG[suggestion.type] ?? TYPE_CONFIG.question;
 
+  function handleKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      onReveal();
+    }
+  }
+
   return (
     <div
       onClick={onReveal}
-      className={`bg-surface-container border border-white/5 border-l-[3px] ${cfg.border} p-4 rounded-xl flex flex-col gap-3 cursor-pointer hover:border-white/10 transition-colors ${opacity} ${
+      onKeyDown={handleKeyDown}
+      role="button"
+      tabIndex={0}
+      aria-label={`${cfg.label}: ${suggestion.preview}`}
+      className={`bg-surface-container border border-white/5 border-l-[3px] ${cfg.border} p-4 rounded-xl flex flex-col gap-3 cursor-pointer hover:border-white/10 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary transition-colors ${opacity} ${
         isActive ? "ring-1 ring-primary/40" : ""
       }`}
     >
@@ -79,20 +90,20 @@ function SuggestionCard({
         <span className={`${cfg.badge} text-[10px] font-bold px-2 py-0.5 rounded tracking-widest uppercase shrink-0`}>
           {cfg.label}
         </span>
-        <span className="text-[10px] text-gray-500 font-mono shrink-0">{timeAgo(suggestion.createdAt)}</span>
+        <span className="text-[10px] text-on-surface-variant font-mono shrink-0">{timeAgo(suggestion.createdAt)}</span>
       </div>
       <p className="text-body-base text-on-surface font-semibold leading-snug">{suggestion.preview}</p>
       {isNewest && (
         <div className="flex items-center gap-4">
           <button
             onClick={(e) => { e.stopPropagation(); onReveal(); }}
-            className="text-[11px] font-bold text-primary hover:underline uppercase tracking-wide"
+            className="text-[11px] font-bold text-primary hover:underline focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary uppercase tracking-wide py-2 -my-2"
           >
             REVEAL DATA
           </button>
           <button
             onClick={(e) => { e.stopPropagation(); onDismiss(); }}
-            className="text-[11px] font-bold text-gray-500 hover:text-white uppercase tracking-wide transition-colors"
+            className="text-[11px] font-bold text-on-surface-variant hover:text-white focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary uppercase tracking-wide transition-colors py-2 -my-2"
           >
             DISMISS
           </button>
@@ -191,7 +202,7 @@ export function SuggestionsPanel({
         <button
           onClick={handleRefreshClick}
           disabled={buttonDisabled}
-          className={`border px-3 py-1 rounded-full text-[11px] font-semibold transition-colors ${
+          className={`border px-3 py-1 rounded-full text-[11px] font-semibold focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary transition-colors ${
             buttonDisabled
               ? "border-white/5 bg-surface-container text-gray-600 cursor-not-allowed opacity-40"
               : "border-primary/30 bg-primary/10 text-primary hover:bg-primary/20"
@@ -232,7 +243,7 @@ export function SuggestionsPanel({
 
         {/* Empty state */}
         {!isLoading && batches.length === 0 && (
-          <p className="text-body-sm text-gray-600 text-center pt-6">
+          <p className="text-body-sm text-on-surface-variant text-center pt-6">
             {isRecording
               ? "Suggestions appear after the first transcript chunk."
               : "Start recording to generate suggestions."}
@@ -252,7 +263,7 @@ export function SuggestionsPanel({
           return (
             <div key={batch.id} className="space-y-3">
               {batchIndex > 0 && (
-                <p className="text-[10px] text-gray-700 text-center py-1">
+                <p className="text-[10px] text-on-surface-variant text-center py-1">
                   {new Date(batch.createdAt).toLocaleTimeString()}
                 </p>
               )}

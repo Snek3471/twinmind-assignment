@@ -11,11 +11,20 @@ import { ChatPanel } from "@/components/ChatPanel";
 import { SettingsModal } from "@/components/SettingsModal";
 import { Suggestion } from "@/lib/types";
 
+type MobilePanel = "transcript" | "suggestions" | "chat";
+
+const MOBILE_TABS: { id: MobilePanel; label: string; icon: string }[] = [
+  { id: "transcript", label: "Transcript", icon: "mic" },
+  { id: "suggestions", label: "Suggestions", icon: "lightbulb" },
+  { id: "chat", label: "Chat", icon: "chat" },
+];
+
 export default function Home() {
   const { settings, updateSettings, loaded } = useSettings();
   const [showSettings, setShowSettings] = useState(false);
   const [pendingSuggestion, setPendingSuggestion] = useState<Suggestion | null>(null);
   const [activeSuggestionId, setActiveSuggestionId] = useState<string | null>(null);
+  const [mobilePanel, setMobilePanel] = useState<MobilePanel>("transcript");
 
   const {
     status,
@@ -57,6 +66,9 @@ export default function Home() {
   const handleSelectSuggestion = useCallback((suggestion: Suggestion) => {
     setActiveSuggestionId(suggestion.id);
     setPendingSuggestion(suggestion);
+    // On mobile, selecting a suggestion moves the conversation to Chat —
+    // without this the response streams in on a tab the user has left.
+    setMobilePanel("chat");
   }, []);
 
   const handleExport = useCallback(() => {
@@ -131,14 +143,15 @@ export default function Home() {
         <div className="flex items-center gap-4">
           <button
             onClick={handleExport}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-lg border-subtle hover:bg-white/5 transition-all active:scale-95 text-on-surface-variant"
+            aria-label="Export session"
+            className="flex items-center gap-2 px-3 py-1.5 rounded-lg border-subtle hover:bg-white/5 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary transition-all active:scale-95 text-on-surface-variant"
           >
             <span className="material-symbols-outlined text-[20px]">download</span>
-            <span className="text-column-header">EXPORT</span>
+            <span className="text-column-header hidden sm:inline">EXPORT</span>
           </button>
           <button
             onClick={() => setShowSettings(true)}
-            className="p-2 rounded-lg hover:bg-white/5 transition-all active:scale-95 text-on-surface-variant"
+            className="p-2 rounded-lg hover:bg-white/5 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary transition-all active:scale-95 text-on-surface-variant"
             aria-label="Open settings"
           >
             <span className="material-symbols-outlined text-[20px]">settings</span>
@@ -146,38 +159,74 @@ export default function Home() {
         </div>
       </header>
 
-      {/* Three-column workspace */}
-      <main className="flex-1 flex overflow-hidden">
-        <TranscriptPanel
-          status={status}
-          chunks={chunks}
-          error={transcriptError}
-          onStart={startRecording}
-          onStop={stopRecording}
-        />
+      {/* Three-column workspace on desktop; one tab-switched panel at a time below md */}
+      <main className="flex-1 flex overflow-hidden min-h-0">
+        <div className={`${mobilePanel === "transcript" ? "flex" : "hidden"} md:flex flex-1 min-w-0`}>
+          <TranscriptPanel
+            status={status}
+            chunks={chunks}
+            error={transcriptError}
+            onStart={startRecording}
+            onStop={stopRecording}
+          />
+        </div>
 
-        <SuggestionsPanel
-          batches={batches}
-          batchCount={batchCount}
-          isLoading={suggestionsLoading}
-          isRecording={isRecording}
-          error={suggestionsError}
-          activeSuggestionId={activeSuggestionId}
-          refreshIntervalS={settings.suggestionsRefreshInterval ?? 30}
-          onReload={handleReload}
-          onSelectSuggestion={handleSelectSuggestion}
-        />
+        <div className={`${mobilePanel === "suggestions" ? "flex" : "hidden"} md:flex flex-1 min-w-0`}>
+          <SuggestionsPanel
+            batches={batches}
+            batchCount={batchCount}
+            isLoading={suggestionsLoading}
+            isRecording={isRecording}
+            error={suggestionsError}
+            activeSuggestionId={activeSuggestionId}
+            refreshIntervalS={settings.suggestionsRefreshInterval ?? 30}
+            onReload={handleReload}
+            onSelectSuggestion={handleSelectSuggestion}
+          />
+        </div>
 
-        <ChatPanel
-          messages={messages}
-          isStreaming={isStreaming}
-          error={chatError}
-          pendingSuggestion={pendingSuggestion}
-          onSendMessage={sendMessage}
-          onSendSuggestion={sendSuggestion}
-          onClearPendingSuggestion={() => setPendingSuggestion(null)}
-        />
+        <div className={`${mobilePanel === "chat" ? "flex" : "hidden"} md:flex flex-1 min-w-0`}>
+          <ChatPanel
+            messages={messages}
+            isStreaming={isStreaming}
+            error={chatError}
+            pendingSuggestion={pendingSuggestion}
+            onSendMessage={sendMessage}
+            onSendSuggestion={sendSuggestion}
+            onClearPendingSuggestion={() => setPendingSuggestion(null)}
+          />
+        </div>
       </main>
+
+      {/* Mobile panel switcher — replaces the side-by-side columns below md */}
+      <nav
+        aria-label="Workspace panels"
+        className="md:hidden flex items-stretch h-14 border-t border-white/10 bg-surface-container-lowest flex-shrink-0"
+      >
+        {MOBILE_TABS.map((tab) => {
+          const isActive = mobilePanel === tab.id;
+          const showBadge = tab.id === "suggestions" && batchCount > 0;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setMobilePanel(tab.id)}
+              aria-current={isActive ? "page" : undefined}
+              className={`relative flex-1 flex flex-col items-center justify-center gap-0.5 min-h-[44px] transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary focus-visible:ring-inset ${
+                isActive ? "text-primary" : "text-on-surface-variant"
+              }`}
+            >
+              <span className="material-symbols-outlined text-[22px]">{tab.icon}</span>
+              <span className="text-[10px] font-semibold tracking-wide">{tab.label}</span>
+              {showBadge && !isActive && (
+                <span
+                  className="absolute top-1.5 right-[calc(50%-20px)] w-1.5 h-1.5 rounded-full bg-primary"
+                  aria-hidden="true"
+                />
+              )}
+            </button>
+          );
+        })}
+      </nav>
 
       {showSettings && (
         <SettingsModal

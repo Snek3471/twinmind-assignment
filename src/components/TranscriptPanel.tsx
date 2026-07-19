@@ -58,7 +58,7 @@ export function TranscriptPanel({ status, chunks, error, onStart, onStop }: Tran
           <button
             onClick={isRecording ? onStop : onStart}
             aria-label={isRecording ? "Stop recording" : "Start recording"}
-            className={`relative w-16 h-16 rounded-full flex items-center justify-center text-white active:scale-90 transition-all ${
+            className={`relative w-16 h-16 rounded-full flex items-center justify-center text-white active:scale-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background transition-all ${
               isRecording
                 ? "bg-accent-orange"
                 : "bg-surface-container border border-white/10 hover:bg-surface-container-high"
@@ -67,7 +67,7 @@ export function TranscriptPanel({ status, chunks, error, onStart, onStop }: Tran
             <span className="material-symbols-outlined text-[32px]">mic</span>
           </button>
         </div>
-        <p className="mt-5 text-body-sm text-gray-500">
+        <p className="mt-5 text-body-sm text-on-surface-variant">
           {isRecording
             ? "Listening to system audio..."
             : status === "error"
@@ -87,7 +87,7 @@ export function TranscriptPanel({ status, chunks, error, onStart, onStop }: Tran
 
         {/* Empty state */}
         {chunks.length === 0 && !error && (
-          <p className="text-body-sm text-gray-600 text-center pt-4">
+          <p className="text-body-sm text-on-surface-variant text-center pt-4">
             No transcript yet — start the mic.
           </p>
         )}
@@ -95,7 +95,7 @@ export function TranscriptPanel({ status, chunks, error, onStart, onStop }: Tran
         {/* Transcript chunks */}
         {chunks.map((chunk) => (
           <div key={chunk.id} className="flex gap-4">
-            <span className="text-[10px] font-mono text-gray-600 mt-1 shrink-0">
+            <span className="text-[10px] font-mono text-on-surface-variant mt-1 shrink-0">
               {formatTime(chunk.timestamp)}
             </span>
             <p className="text-body-base text-on-surface leading-relaxed">{chunk.text}</p>
@@ -105,7 +105,7 @@ export function TranscriptPanel({ status, chunks, error, onStart, onStop }: Tran
         {/* Live processing indicator */}
         {isRecording && (
           <div className="flex gap-4 opacity-50">
-            <span className="text-[10px] font-mono text-gray-600 mt-1 shrink-0">
+            <span className="text-[10px] font-mono text-on-surface-variant mt-1 shrink-0">
               {formatTime(Date.now())}
             </span>
             <p className="text-body-base text-on-surface italic">

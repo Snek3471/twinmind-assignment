@@ -31,7 +31,7 @@ function MessageBubble({ message }: { message: ChatMessage }) {
           <span className="inline-block w-1.5 h-4 bg-primary animate-pulse ml-0.5 align-middle rounded-sm" />
         )}
       </div>
-      <span className="text-[10px] text-gray-600 px-1">
+      <span className="text-[10px] text-on-surface-variant px-1">
         {isUser ? "You" : "AI Assistant"} • {new Date(message.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
       </span>
     </div>
@@ -86,14 +86,14 @@ export function ChatPanel({
       {/* Column header */}
       <div className="h-12 flex items-center justify-between px-6 border-b border-white/10 flex-shrink-0">
         <h2 className="text-column-header text-on-surface-variant">CHAT</h2>
-        <span className="text-[10px] font-bold text-gray-600 tracking-wider uppercase">SESSION-ONLY</span>
+        <span className="text-[10px] font-bold text-on-surface-variant tracking-wider uppercase">SESSION-ONLY</span>
       </div>
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-6 space-y-4 min-h-0">
         {/* Empty state */}
         {messages.length === 0 && (
-          <p className="text-body-sm text-gray-600 text-center pt-6">
+          <p className="text-body-sm text-on-surface-variant text-center pt-6">
             Click a suggestion or type a question below.
           </p>
         )}
@@ -122,13 +122,13 @@ export function ChatPanel({
             onKeyDown={handleKeyDown}
             placeholder="Type a message or question..."
             disabled={isStreaming}
-            className="w-full bg-surface-container border border-white/10 rounded-full px-5 py-3.5 pr-14 focus:outline-none focus:ring-1 focus:ring-primary text-body-base text-on-surface placeholder:text-gray-600 disabled:opacity-50"
+            className="w-full bg-surface-container border border-white/10 rounded-full px-5 py-3.5 pr-14 focus:outline-none focus:ring-1 focus:ring-primary text-body-base text-on-surface placeholder:text-on-surface-variant disabled:opacity-50"
           />
           <button
             type="submit"
             disabled={!input.trim() || isStreaming}
             aria-label="Send"
-            className="absolute right-2 p-2.5 bg-primary text-white rounded-full active:scale-90 transition-transform flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed hover:brightness-110"
+            className="absolute right-2 p-2.5 bg-primary text-white rounded-full active:scale-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background transition-transform flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed hover:brightness-110"
           >
             <span className="material-symbols-outlined text-[20px]">send</span>
           </button>

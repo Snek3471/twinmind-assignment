@@ -117,6 +117,18 @@
   }
 }
 
+/* Reduced motion: keep the live/recording signal visible but static —
+   never animate it away entirely, since that's the user's only cue. */
+@media (prefers-reduced-motion: reduce) {
+  .animate-pulse-ring {
+    animation: none;
+    opacity: 0.15;
+  }
+  .animate-pulse {
+    animation: none;
+  }
+}
+
 *,
 *::before,
 *::after {
